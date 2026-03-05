@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>出遊分帳本</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .modal-transition { transition: transform 0.3s ease-in-out; }
+    .modal-hidden { transform: translateY(100%); }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  </style>
+</head>
+<body class="bg-gray-100 flex justify-center text-gray-800 font-sans">
+
+  <div class="bg-white w-full max-w-md min-h-screen relative shadow-xl overflow-hidden flex flex-col">
+    
+    <header class="bg-white px-6 py-4 flex justify-between items-center sticky top-0 z-30 shadow-sm">
+      <h1 class="text-xl font-bold">出遊分帳本</h1>
+      <button onclick="toggleSettings(true)" class="text-gray-500 hover:text-gray-700 active:scale-95 transition-transform">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+      </button>
+    </header>
+
+    <main class="flex-1 overflow-y-auto no-scrollbar pb-24">
+      <div id="view-dashboard" class="block">
+        <div class="px-6 py-2">
+          <div class="bg-gradient-to-r from-blue-500 to-indigo-500 rounded-2xl p-6 text-white shadow-lg">
+            <p class="text-sm opacity-80 mb-1">群組總花費</p>
+            <h2 id="total-expense" class="text-3xl font-bold mb-4">$ 0</h2>
+            <div class="flex justify-between border-t border-white/20 pt-4 mt-2">
+              <div>
+                <p class="text-xs opacity-80">我的結餘 <span id="my-name-label" class="bg-white/20 px-1.5 py-0.5 rounded text-[10px] ml-1">未設定</span></p>
+                <p id="my-balance" class="text-lg font-semibold">$ 0</p>
+              </div>
+              <div class="text-right">
+                <p class="text-xs opacity-80">我已代墊</p>
+                <p id="my-paid" class="text-lg font-semibold">$ 0</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="px-6 py-6">
+          <h3 class="text-lg font-bold mb-4">近期花費 <span class="text-xs text-gray-400 font-normal ml-2">(點擊可修改)</span></h3>
+          <div id="expense-list" class="space-y-4"></div>
+        </div>
+      </div>
+
+      <div id="view-settlement" class="hidden px-6 py-4">
+        <h2 class="text-2xl font-bold mb-6 text-center">最終結算</h2>
+        <div id="settlement-list" class="space-y-4"></div>
+      </div>
+    </main>
+
+    <div id="settings-backdrop" class="fixed inset-0 bg-black/50 z-40 hidden transition-opacity" onclick="toggleSettings(false)"></div>
+    <div id="settings-modal" class="fixed bottom-0 w-full max-w-md bg-white rounded-t-3xl z-50 p-6 modal-transition modal-hidden shadow-2xl h-[85vh] flex flex-col">
+      <div class="w-12 h-1 bg-gray-300 rounded-full mx-auto mb-6"></div>
+      <h2 class="text-xl font-bold mb-6">設定與成員管理</h2>
+      <div class="flex-1 overflow-y-auto space-y-6 pb-6">
+        
+        <div class="bg-blue-50 p-4 rounded-xl border border-blue-100">
+          <label class="block text-sm font-bold text-blue-800 mb-2">這支手機是誰的？(計算我的結餘)</label>
+          <select id="select-whoami" onchange="changeUser()" class="w-full border border-gray-200 rounded-lg py-2 px-3 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </select>
+        </div>
+
+        <div class="bg-gray-50 p-4 rounded-xl border border-gray-100">
+          <label class="block text-sm font-bold text-gray-600 mb-2">新增同行成員</label>
+          <div class="flex gap-2">
+            <input id="new-member-input" type="text" placeholder="輸入朋友名字" class="flex-1 border border-gray-200 rounded-lg py-2 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <button onclick="addMember()" class="bg-blue-100 text-blue-600 font-bold px-4 rounded-lg hover:bg-blue-200">加入</button>
+          </div>
+        </div>
+        
+        <div>
+          <label class="block text-sm font-bold text-gray-600 mb-2">目前群組成員</label>
+          <div id="member-badges" class="flex flex-wrap gap-2">
+            <span class="text-sm text-gray-400">尚未新增任何成員</span>
+          </div>
+        </div>
+        <hr class="border-gray-200">
+        <div>
+          <label class="block text-sm font-bold text-red-500 mb-2">危險操作</label>
+          <button onclick="resetExpenses()" class="w-full border-2 border-red-500 text-red-500 font-bold py-3 rounded-xl hover:bg-red-50 transition-colors">
+            清空所有雲端帳目 (初始化)
+          </button>
+        </div>
+      </div>
+      <button onclick="toggleSettings(false)" class="w-full bg-gray-800 text-white font-bold text-lg py-4 rounded-xl mt-2 hover:bg-gray-900">完成</button>
+    </div>
+
+    <div id="modal-backdrop" class="fixed inset-0 bg-black/50 z-40 hidden transition-opacity" onclick="toggleModal(false)"></div>
+    <div id="add-modal" class="fixed bottom-0 w-full max-w-md bg-white rounded-t-3xl z-50 p-6 modal-transition modal-hidden shadow-2xl h-[90vh] flex flex-col">
+      <div class="w-12 h-1 bg-gray-300 rounded-full mx-auto mb-6"></div>
+      <h2 id="modal-title" class="text-xl font-bold mb-4">新增一筆花費</h2>
+      
+      <div class="flex-1 overflow-y-auto space-y-5 pb-4">
+        <div>
+          <label class="block text-sm font-bold text-gray-600 mb-1">總金額</label>
+          <div class="relative">
+            <span class="absolute left-4 top-1/2 -translate-y-1/2 text-2xl text-gray-500">$</span>
+            <input id="input-amount" type="number" placeholder="0" class="w-full bg-gray-100 rounded-xl py-3 pl-10 pr-4 text-2xl font-bold focus:outline-none focus:ring-2 focus:ring-blue-500">
+          </div>
+        </div>
+        <div>
+          <label class="block text-sm font-bold text-gray-600 mb-1">項目名稱</label>
+          <input id="input-item" type="text" placeholder="例如：晚餐、交通" class="w-full border border-gray-200 rounded-xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+        <div>
+          <label class="block text-sm font-bold text-gray-600 mb-1">誰代墊的？</label>
+          <select id="input-payer" class="w-full border border-gray-200 rounded-xl py-3 px-4 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"></select>
+        </div>
+        <div class="bg-blue-50 p-4 rounded-xl border border-blue-100">
+          <div class="flex justify-between items-center mb-3">
+            <label class="block text-sm font-bold text-blue-800">誰要付多少？</label>
+            <button onclick="distributeEqually()" class="text-xs bg-blue-500 text-white font-bold px-3 py-1.5 rounded-lg active:scale-95 shadow-sm">
+              ✨ 一鍵平分
+            </button>
+          </div>
+          <div id="split-inputs-container" class="space-y-3"></div>
+        </div>
+      </div>
+      <div class="flex gap-3 mt-2">
+        <button id="btn-delete" onclick="deleteExpense()" class="hidden w-24 bg-red-100 text-red-600 font-bold text-lg py-4 rounded-xl hover:bg-red-200 active:scale-95 transition-transform">刪除</button>
+        <button id="btn-save" onclick="saveExpense()" class="flex-1 bg-blue-500 text-white font-bold text-lg py-4 rounded-xl hover:bg-blue-600 active:scale-95 transition-transform">儲存花費</button>
+      </div>
+    </div>
+
+    <nav class="fixed bottom-0 w-full max-w-md bg-white border-t border-gray-200 px-6 py-2 flex justify-between items-center text-xs text-gray-400 z-30 pb-safe">
+      <button onclick="switchTab('dashboard')" id="nav-dashboard" class="flex flex-col items-center gap-1 text-blue-500 font-bold w-16">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
+        <span>總覽</span>
+      </button>
+      <button onclick="openAddModal()" class="bg-blue-500 text-white w-14 h-14 rounded-full flex items-center justify-center shadow-lg -mt-6 border-4 border-white active:scale-95 transition-transform">
+        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+      </button>
+      <button onclick="switchTab('settlement')" id="nav-settlement" class="flex flex-col items-center gap-1 hover:text-gray-600 w-16">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
+        <span>結算</span>
+      </button>
+    </nav>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, deleteDoc, getDocs, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+    // 你的 Firebase 金鑰
+    const firebaseConfig = {
+      apiKey: "AIzaSyC_HMAWXKiV-ywOhWDCJRMz-thXI3ZgMe8",
+      authDomain: "splitwise-86fae.firebaseapp.com",
+      projectId: "splitwise-86fae",
+      storageBucket: "splitwise-86fae.firebasestorage.app",
+      messagingSenderId: "538593464491",
+      appId: "1:538593464491:web:c0da5c86e55c23d99ca7ee",
+      measurementId: "G-6GR3HBQQT3"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    // ✨ 核心改變：全部淨空，依靠 LocalStorage 記憶 ✨
+    let currentUser = localStorage.getItem('splitwise_user') || ''; 
+    let members = JSON.parse(localStorage.getItem('splitwise_members')) || []; 
+    let expenses = []; 
+    let currentEditId = null; 
+
+    // 監聽雲端資料庫
+    const expensesRef = collection(db, "expenses");
+    const q = query(expensesRef, orderBy("timestamp", "asc"));
+
+    onSnapshot(q, (snapshot) => {
+      expenses = []; 
+      snapshot.forEach((doc) => {
+        expenses.push({ id: doc.id, ...doc.data() });
+      });
+      renderApp();
+    });
+
+    // ✨ 新增：切換「我是誰」
+    window.changeUser = function() {
+      currentUser = document.getElementById('select-whoami').value;
+      localStorage.setItem('splitwise_user', currentUser);
+      renderApp();
+    };
+
+    window.distributeEqually = function() {
+      const total = parseInt(document.getElementById('input-amount').value) || 0;
+      if (total === 0) return alert('請先輸入上方總金額喔！');
+      
+      const inputs = document.querySelectorAll('.split-amount-input');
+      if(inputs.length === 0) return;
+
+      const baseAmount = Math.floor(total / inputs.length);
+      let remainder = total % inputs.length; 
+      
+      inputs.forEach(input => {
+        let amt = baseAmount + (remainder > 0 ? 1 : 0);
+        input.value = amt;
+        remainder--;
+      });
+    };
+
+    window.saveExpense = async function() {
+      const amountInput = parseInt(document.getElementById('input-amount').value);
+      const itemInput = document.getElementById('input-item').value;
+      const payerInput = document.getElementById('input-payer').value;
+
+      if (!amountInput || !itemInput) return alert('請輸入金額和項目名稱！');
+
+      const splitDetails = {};
+      let checkTotal = 0;
+      document.querySelectorAll('.split-amount-input').forEach(input => {
+        const val = parseInt(input.value) || 0;
+        splitDetails[input.dataset.name] = val;
+        checkTotal += val;
+      });
+
+      if (checkTotal !== amountInput) {
+        return alert(`分攤金額不對喔！\n你分配了 $${checkTotal}，但總金額是 $${amountInput}。`);
+      }
+
+      try {
+        const expenseData = {
+          item: itemInput,
+          payer: payerInput,
+          amount: amountInput,
+          splitDetails: splitDetails
+        };
+
+        if (currentEditId) {
+          await updateDoc(doc(db, "expenses", currentEditId), expenseData);
+        } else {
+          expenseData.timestamp = Date.now();
+          await addDoc(collection(db, "expenses"), expenseData);
+        }
+        toggleModal(false);
+      } catch (e) {
+        alert('儲存失敗！');
+      }
+    };
+
+    window.deleteExpense = async function() {
+      if (!currentEditId) return;
+      if (confirm('確定要刪除這筆花費紀錄嗎？\n刪除後無法復原喔！')) {
+        await deleteDoc(doc(db, "expenses", currentEditId));
+        toggleModal(false);
+      }
+    };
+
+    window.resetExpenses = async function() {
+      if (confirm('注意！這將會清空雲端所有的花費紀錄。\n確定要初始化帳本嗎？')) {
+        const querySnapshot = await getDocs(collection(db, "expenses"));
+        querySnapshot.forEach(async (docSnap) => {
+          await deleteDoc(docSnap.ref);
+        });
+        toggleSettings(false);
+        alert('雲端帳本已初始化！');
+      }
+    };
+
+    // ✨ 新增：刪除成員功能 ✨
+    window.removeMember = function(name) {
+      if(confirm(`確定要移除「${name}」嗎？`)) {
+        members = members.filter(m => m !== name);
+        localStorage.setItem('splitwise_members', JSON.stringify(members));
+        // 如果刪除的是自己，就把 currentUser 設為空
+        if (currentUser === name) {
+          currentUser = '';
+          localStorage.removeItem('splitwise_user');
+        }
+        updateMemberUI();
+        renderApp();
+      }
+    };
+
+    window.addMember = function() {
+      const input = document.getElementById('new-member-input');
+      const newName = input.value.trim();
+      if (!newName) return alert('請輸入名字！');
+      if (members.includes(newName)) return alert('已經在群組裡囉！');
+      
+      members.push(newName);
+      // 將成員名單存入手機記憶體
+      localStorage.setItem('splitwise_members', JSON.stringify(members));
+      input.value = '';
+      
+      // 如果這是第一個加入的成員，自動把他設為當前使用者
+      if(members.length === 1 && !currentUser) {
+        currentUser = newName;
+        localStorage.setItem('splitwise_user', currentUser);
+      }
+
+      updateMemberUI();
+      renderApp();
+    };
+
+    function updateMemberUI() {
+      // 1. 更新設定頁面標籤 (加入刪除按鈕)
+      const badgesContainer = document.getElementById('member-badges');
+      if (members.length === 0) {
+        badgesContainer.innerHTML = '<span class="text-sm text-gray-400">尚未新增任何成員</span>';
+      } else {
+        badgesContainer.innerHTML = '';
+        members.forEach(m => {
+          badgesContainer.innerHTML += `
+            <span class="bg-gray-200 text-gray-700 px-3 py-1 rounded-full text-sm font-bold flex items-center gap-1">
+              ${m} 
+              <button onclick="removeMember('${m}')" class="text-gray-400 hover:text-red-500 ml-1 leading-none text-lg">&times;</button>
+            </span>`;
+        });
+      }
+      
+      // 2. 更新「我是誰」下拉選單
+      const meSelect = document.getElementById('select-whoami');
+      meSelect.innerHTML = members.length === 0 ? '<option value="">請先新增成員...</option>' : '<option value="">請選擇...</option>';
+      members.forEach(m => {
+        let opt = document.createElement('option');
+        opt.value = m;
+        opt.text = m;
+        if(m === currentUser) opt.selected = true;
+        meSelect.appendChild(opt);
+      });
+
+      // 3. 更新代墊人選單
+      const payerSelect = document.getElementById('input-payer');
+      payerSelect.innerHTML = ''; 
+      members.forEach(member => {
+        let option = document.createElement('option');
+        option.value = member;
+        option.text = member;
+        payerSelect.appendChild(option);
+      });
+
+      // 4. 更新自訂分攤金額輸入框
+      const splitContainer = document.getElementById('split-inputs-container');
+      splitContainer.innerHTML = '';
+      members.forEach(member => {
+        splitContainer.innerHTML += `
+          <div class="flex items-center justify-between bg-white px-3 py-2 rounded-lg border border-gray-200">
+            <span class="font-bold text-gray-700">${member}</span>
+            <div class="flex items-center gap-2">
+              <span class="text-gray-400">$</span>
+              <input type="number" data-name="${member}" value="0" class="split-amount-input w-20 bg-gray-50 border border-gray-200 rounded p-1 text-right font-bold focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+          </div>
+        `;
+      });
+    }
+
+    window.openAddModal = function() {
+      if (members.length === 0) return alert('請先點擊右上角「設定」，新增同行成員喔！');
+
+      currentEditId = null; 
+      document.getElementById('modal-title').innerText = "新增一筆花費";
+      document.getElementById('btn-save').innerText = "儲存花費";
+      document.getElementById('btn-delete').classList.add('hidden'); 
+      
+      document.getElementById('input-amount').value = '';
+      document.getElementById('input-item').value = '';
+      // 預設代墊人為目前設定的「我」
+      if (currentUser) document.getElementById('input-payer').value = currentUser;
+      document.querySelectorAll('.split-amount-input').forEach(input => input.value = 0);
+      
+      toggleModal(true);
+    };
+
+    window.openEditModal = function(id) {
+      currentEditId = id; 
+      const exp = expenses.find(e => e.id === id);
+      if (!exp) return;
+
+      document.getElementById('modal-title').innerText = "編輯花費細節";
+      document.getElementById('btn-save').innerText = "更新花費";
+      document.getElementById('btn-delete').classList.remove('hidden'); 
+
+      document.getElementById('input-amount').value = exp.amount;
+      document.getElementById('input-item').value = exp.item;
+      // 確保下拉選單有這個人才能選
+      if(members.includes(exp.payer)) {
+        document.getElementById('input-payer').value = exp.payer;
+      }
+
+      document.querySelectorAll('.split-amount-input').forEach(input => {
+        const memberName = input.dataset.name;
+        input.value = exp.splitDetails && exp.splitDetails[memberName] !== undefined ? exp.splitDetails[memberName] : 0;
+      });
+
+      toggleModal(true);
+    };
+
+    window.switchTab = function(tab) {
+      document.getElementById('view-dashboard').classList.add('hidden');
+      document.getElementById('view-settlement').classList.add('hidden');
+      document.getElementById('nav-dashboard').classList.remove('text-blue-500', 'font-bold');
+      document.getElementById('nav-settlement').classList.remove('text-blue-500', 'font-bold');
+      if(tab === 'dashboard') {
+        document.getElementById('view-dashboard').classList.remove('hidden');
+        document.getElementById('nav-dashboard').classList.add('text-blue-500', 'font-bold');
+      } else {
+        document.getElementById('view-settlement').classList.remove('hidden');
+        document.getElementById('nav-settlement').classList.add('text-blue-500', 'font-bold');
+      }
+    };
+
+    window.toggleModal = function(show) {
+      const modal = document.getElementById('add-modal');
+      const backdrop = document.getElementById('modal-backdrop');
+      if(show) {
+        backdrop.classList.remove('hidden');
+        setTimeout(() => modal.classList.remove('modal-hidden'), 10);
+      } else {
+        modal.classList.add('modal-hidden');
+        setTimeout(() => backdrop.classList.add('hidden'), 300);
+      }
+    };
+
+    window.toggleSettings = function(show) {
+      const modal = document.getElementById('settings-modal');
+      const backdrop = document.getElementById('settings-backdrop');
+      if(show) {
+        backdrop.classList.remove('hidden');
+        setTimeout(() => modal.classList.remove('modal-hidden'), 10);
+      } else {
+        modal.classList.add('modal-hidden');
+        setTimeout(() => backdrop.classList.add('hidden'), 300);
+      }
+    };
+
+    function renderApp() {
+      renderDashboard();
+      renderSettlement();
+    }
+
+    function renderDashboard() {
+      let totalExpense = 0;
+      let myPaid = 0;
+      let balances = calculateBalances(expenses);
+      let myBalance = currentUser ? (balances[currentUser] || 0) : 0;
+      
+      // 更新標題顯示「我是誰」
+      document.getElementById('my-name-label').innerText = currentUser || "未設定";
+
+      const listContainer = document.getElementById('expense-list');
+      listContainer.innerHTML = ''; 
+
+      if(expenses.length === 0) {
+        listContainer.innerHTML = `<p class="text-center text-gray-400 mt-6">目前還沒有任何花費紀錄</p>`;
+      }
+
+      expenses.forEach(exp => {
+        totalExpense += exp.amount;
+        if (currentUser && exp.payer === currentUser) myPaid += exp.amount;
+        
+        let myShareText = '';
+        if (currentUser && exp.splitDetails && exp.splitDetails[currentUser] > 0) {
+           myShareText = `<span class="text-blue-500 ml-1">我付 $${exp.splitDetails[currentUser]}</span>`;
+        } else if (currentUser && exp.splitDetails && exp.splitDetails[currentUser] === 0) {
+           myShareText = `<span class="text-gray-400 ml-1">我沒參與</span>`;
+        } else if (!currentUser) {
+           myShareText = `<span class="text-gray-400 ml-1">請先設定你是誰</span>`;
+        }
+
+        let payerText = (currentUser && exp.payer === currentUser) ? '我' : exp.payer;
+
+        listContainer.innerHTML += `
+          <div onclick="openEditModal('${exp.id}')" class="cursor-pointer flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-100 hover:bg-gray-100 transition-colors active:scale-[0.98]">
+            <div class="flex items-center gap-4">
+              <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-500 font-bold">
+                ${exp.item.charAt(0)}
+              </div>
+              <div>
+                <p class="font-bold text-gray-800">${exp.item}</p>
+                <p class="text-xs text-gray-500">${payerText} 先墊 • ${myShareText}</p>
+              </div>
+            </div>
+            <p class="font-bold text-gray-800">$ ${exp.amount}</p>
+          </div>
+        `;
+      });
+
+      document.getElementById('total-expense').innerText = `$ ${totalExpense}`;
+      document.getElementById('my-paid').innerText = `$ ${myPaid}`;
+      
+      const balanceEl = document.getElementById('my-balance');
+      if (!currentUser) {
+        balanceEl.innerText = `-`;
+        balanceEl.className = "text-lg font-semibold text-gray-300";
+      } else if (myBalance > 0) {
+        balanceEl.innerText = `+ $ ${Math.abs(myBalance)}`;
+        balanceEl.className = "text-lg font-semibold text-green-200";
+      } else if (myBalance < 0) {
+        balanceEl.innerText = `- $ ${Math.abs(myBalance)}`;
+        balanceEl.className = "text-lg font-semibold text-red-200";
+      } else {
+        balanceEl.innerText = `$ 0`;
+        balanceEl.className = "text-lg font-semibold text-white";
+      }
+    }
+
+    function calculateBalances(expensesData) {
+      let balances = {};
+      members.forEach(m => balances[m] = 0); 
+      
+      expensesData.forEach(exp => {
+        if(balances[exp.payer] === undefined) balances[exp.payer] = 0;
+        balances[exp.payer] += exp.amount;
+        
+        if (exp.splitDetails) {
+          for (let person in exp.splitDetails) {
+            if(balances[person] === undefined) balances[person] = 0;
+            balances[person] -= exp.splitDetails[person];
+          }
+        }
+      });
+      
+      for (let person in balances) {
+        balances[person] = Math.round(balances[person]);
+      }
+      return balances;
+    }
+
+    function renderSettlement() {
+      let balances = calculateBalances(expenses);
+      let debtors = [];
+      let creditors = [];
+      for (let person in balances) {
+        if (balances[person] < 0) debtors.push({ person, amount: Math.abs(balances[person]) });
+        else if (balances[person] > 0) creditors.push({ person, amount: balances[person] });
+      }
+      debtors.sort((a, b) => b.amount - a.amount);
+      creditors.sort((a, b) => b.amount - a.amount);
+
+      let transactions = [];
+      let i = 0, j = 0;
+      while (i < debtors.length && j < creditors.length) {
+        let debtor = debtors[i];
+        let creditor = creditors[j];
+        let settleAmount = Math.min(debtor.amount, creditor.amount);
+        if (settleAmount > 0) {
+          transactions.push({ from: debtor.person, to: creditor.person, amount: settleAmount });
+        }
+        debtor.amount -= settleAmount;
+        creditor.amount -= settleAmount;
+        if (debtor.amount === 0) i++;
+        if (creditor.amount === 0) j++;
+      }
+
+      const listContainer = document.getElementById('settlement-list');
+      listContainer.innerHTML = '';
+      if (transactions.length === 0) {
+        listContainer.innerHTML = `<p class="text-center text-gray-400 mt-10">目前沒有需要結算的款項喔！</p>`;
+        return;
+      }
+      transactions.forEach(t => {
+        listContainer.innerHTML += `
+          <div class="bg-white border border-gray-200 shadow-sm rounded-xl p-5 flex items-center justify-between">
+            <div class="flex flex-col items-center w-12">
+              <div class="w-10 h-10 bg-gray-100 rounded-full mb-1 flex items-center justify-center font-bold text-gray-700">${t.from.charAt(0)}</div>
+              <span class="text-xs font-bold text-red-500">支付</span>
+            </div>
+            <div class="flex flex-col items-center flex-1 px-4">
+              <span class="text-xl font-bold text-gray-800">$ ${t.amount}</span>
+              <div class="w-full h-[2px] bg-gray-300 relative my-2">
+                <div class="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 w-2 h-2 border-t-2 border-r-2 border-gray-400 rotate-45"></div>
+              </div>
+            </div>
+            <div class="flex flex-col items-center w-12">
+              <div class="w-10 h-10 bg-blue-100 rounded-full mb-1 flex items-center justify-center font-bold text-blue-700">${t.to.charAt(0)}</div>
+              <span class="text-xs font-bold text-green-500">收款</span>
+            </div>
+          </div>
+        `;
+      });
+    }
+
+    updateMemberUI();
+  </script>
+</body>
+</html>
